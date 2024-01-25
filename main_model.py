@@ -30,33 +30,50 @@
            #          不见满街漂亮妹，哪个归得程序员？
 ''''''
 
+
+# IMPORTANT ！！！！
+# don't forget the neuron number
+# don't forget to change the weight
+# don't forget to add the dalay
+# the tau in main equation, pleas find the value, the previous one is arbitarly determined
+# don't forget unless refractory order
+# don't forget you have multiple group functions (eqs)
+# the current variable are all unitless
+
 from brian2 import *
 import matplotlib.pyplot as plt
 import customized_function
+import numpy as np
 
 start_scope()
 
 # define some value
-N_E = 2500      #number of excitatory and inhibitory neuron
-N_I = 1000
+N_E = 1000      #number of excitatory and inhibitory neuron
+N_I = 250
 
-J=0.1*mV
+J=0.1e-3
 g=8       #inhibitory connection factor
 J_E=J
 J_I=-(g*J)      #connection strength, fixed
 
-V_th=20*mV      # firing threshold and reset voltage of LIF
-V_r=10*mV
-t_ref=2*ms      #refractory period
+V_th=20e-3      # firing threshold and reset voltage of LIF
+V_r=10e-3
+t_ref=2e-3      #refractory period
 
 D=1.5*ms        #trasmission delay
 
 Poisson_rate=15*kHz
 enhenced_Poisson_rate=Poisson_rate*1.4      #increase 4.% as the first picture state
 
-target_firing_rate = 8*Hz
+target_firing_rate = 8
 
+# time constant in axonal/dendritic equations
+beta_a=0.4 * second
+beta_d=0.4 * second
 
+# time constant for main equation and calcium concentration
+tau_m=1 * second
+tau_ca=1 * second
 
 # build up neuron groups
 # one excitatory group one inhibitory grou[
@@ -64,13 +81,16 @@ target_firing_rate = 8*Hz
 # input and readout group will be seperately established
 
 # use simple function as an example
-# don't forget unless refractory order
 group_eqs = '''
-dv/dt = (I-v)/tau : 1 (unless refractory)
-I : 1
-tau : second
+dv/dt = (-v)/tau_m : 1 (unless refractory)
 '''
-exc_group = NeuronGroup(N_E, group_eqs, threshold='v>V_th', reset='v=V_r', refractory=t_ref, method='exact')
+group_eqs_exc='''
+dv/dt = (-v)/tau_m : 1 (unless refractory)
+dfai/dt=(-fai)/tau_ca :1   
+drou_a_abs/dt= (target_firing_rate - fai)/beta_a :1
+drou_d_abs/dt= (target_firing_rate - fai)/beta_d :1
+'''
+exc_group = NeuronGroup(N_E, group_eqs_exc, threshold='v>V_th', reset='v=V_r', refractory=t_ref, method='exact')
 inh_group = NeuronGroup(N_I, group_eqs, threshold='v>V_th', reset='v=V_r', refractory=t_ref, method='exact')
 poissoninput_group = PoissonGroup((N_E+N_I), rates=Poisson_rate)
 readout_group = NeuronGroup(1, group_eqs, threshold='v>V_th', reset='v=V_r', refractory=t_ref, method='exact')   #the first picture
@@ -82,7 +102,7 @@ readout_group = NeuronGroup(1, group_eqs, threshold='v>V_th', reset='v=V_r', ref
 # the following three are 3 arries, each 1500 long, containing marker of neurons to determine their group
 # in each maker, any element between 1-2499 is exc neuron, 2501-3499 is inh
 # around 1166-1168 for each len(marker) expected
-US_marker,C1_marker,C2_marker = customized_function.assign_group()
+US_marker,C1_marker,C2_marker = customized_function.assign_group(N_E,N_I)
 
 
 
@@ -118,12 +138,18 @@ synapse_p2i = Synapses(poissoninput_group, inh_group, 'w : 1', on_pre='v_post +=
 synapse_p2i.connect(i=list(range(N_E,N_E+N_I,1)), j=list(range(0,N_I,1)))   #2500-3499 of poisson connect to 0-1499 of inh
 synapse_p2i.w = 'rand()'
 
-#bind all exc to readout group
+# bind all exc to readout group
 synapse_e2r = Synapses(exc_group, readout_group, 'w : 1', on_pre='v_post += w')
 synapse_e2r.connect(i=list(range(0,N_E,1)), j=[0])   # all exc (0-2499) connect to readout[0]
 synapse_e2r.w = 'rand()'
 
-# customized_function.check_synapseconnection(synapse_i2e)
+# bind all exc to exc but with zero initial weight
+# because the initial C is a zero matrix
+synapse_e2e = Synapses(exc_group, exc_group, 'w : 1', on_pre='v_post += w')
+synapse_e2e.connect(condition='i!=j')   # all econnect to all exc
+synapse_e2e.w = 'rand()'
+
+#customized_function.check_synapseconnection(synapse_e2e)
 
 network = Network(exc_group , inh_group , poissoninput_group , readout_group,
 synapse_i2i , synapse_i2e , synapse_e2i , synapse_p2i , synapse_p2e , synapse_e2r
