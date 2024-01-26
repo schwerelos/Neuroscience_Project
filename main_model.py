@@ -75,6 +75,13 @@ beta_d=0.4 * second
 tau_m=1 * second
 tau_ca=1 * second
 
+# zero matrix to initialize the parameters, just for the first irritation
+C_matrix= np.zeros((N_E, N_E))
+K_in=np.sum(C_matrix, axis=1)   # array[i] means K_in_i
+K_out=np.sum(C_matrix,axis=0)   # array[i] means K_out_i
+
+
+
 # build up neuron groups
 # one excitatory group one inhibitory grou[
 # assign each nuron a marker (1-3500 in which 1-2500 is excitatory) and divide into three parts based on marker
@@ -89,6 +96,9 @@ dv/dt = (-v)/tau_m : 1 (unless refractory)
 dfai/dt=(-fai)/tau_ca :1   
 drou_a_abs/dt= (target_firing_rate - fai)/beta_a :1
 drou_d_abs/dt= (target_firing_rate - fai)/beta_d :1
+'''
+synapse_eqs_exc='''
+dc/dt= irri_term_pre - (c * irri_term_post)
 '''
 exc_group = NeuronGroup(N_E, group_eqs_exc, threshold='v>V_th', reset='v=V_r', refractory=t_ref, method='exact')
 inh_group = NeuronGroup(N_I, group_eqs, threshold='v>V_th', reset='v=V_r', refractory=t_ref, method='exact')
@@ -155,4 +165,53 @@ network = Network(exc_group , inh_group , poissoninput_group , readout_group,
 synapse_i2i , synapse_i2e , synapse_e2i , synapse_p2i , synapse_p2e , synapse_e2r
 )
 
+@network_operation(when='before_synapses')
+def my_network_operation():
+    # the main purpose of these steps are getting the irritation terms for synaptic variable dc/dt
+    # and record the intermediate variables by the way xD
+
+    # convert synaptic variable c into matrix form
+    # don't need to be converted back because c will irritate in ODE independently
+    # note that the physical meaning of C[i][j] is i from j, but not i to j
+    C_matrix = customized_function.synapsevar_matrix_generator(synapse_e2e, synapse_e2e.c)
+
+    # calculate Kin and Kout
+    K_in = np.sum(C_matrix, axis=1)  # array[i] means K_in_i
+    K_out = np.sum(C_matrix, axis=0)  # array[i] means K_out_i
+
+    # from abs to real free element number, abs should be prepared during the step in group variablees
+    rou_a_plus = np.clip(rou_a_abs, 0, np.inf)   # free axon surplus, larger than or equal to zero
+    rou_a_minus = np.clip(rou_a_abs, -np.inf, 0)   # free axon deficit, smaller than or equal to zero
+    rou_d_plus = np.clip(rou_d_abs, 0, np.inf)   # free dendritic surplus, larger than or equal to zero
+    rou_d_minus = np.clip(rou_d_abs, -np.inf, 0)  # free dendritic deficit, smaller than or equal to zero
+
+    # prepare for correction
+    rows,cols=C_matrix.shape
+    buffer_a = np.zeros(rows)
+    buffer_d = np.zeros(rows)
+
+    for count in range(rows)
+        buffer_a += (rou_d_minus[count]/K_in[count]) .* (C_matrix[count][:]) # correction term  ad sequence is verified
+        buffer_d += (rou_a_minus[count]/K_out[count]) .* (C_matrix[:][count])
+
+    # generate correction term  these are array and final rou
+    rou_a_plus_corrected = rou_a_plus + buffer_a
+    rou_d_plus_corrected = rou_d_plus + buffer_d
+    rou = max(sum(rou_a_plus_corrected),sum(rou_d_plus_corrected))   # should be a number
+
+    # prepare irritation matrix for C
+    irri_matrix_pre = np.zeros.like(C_matrix.shape)   #irritation term in synaptic equation, to be converted
+    irri_matrix_post = np.zeros.like(C_matrix.shape)   #second parameter in the synaptic ODE
+    irri_matrix_pre[i][j] = rou_d_plus[i]*rou_a_plus[j]/rou   #fill in the data based on the ODE
+    irri_matrix_post[i][j] = (rou_d_minus[i] / K_in[i])+(rou_a_minus[j] / K_out[j])
+
+    # convert that into standard brain 2 form for dc/dt irritation
+    # irripre and irripost should be in shape [N,1], in which N is the connection number with sequenced element
+    # transpose inside the customized function make sure that [i][j] represents i from j after being transposed
+    irri_term_pre = customized_function.matrix_to_synapsevar(synapse_e2e, irri_matrix_pre)
+    irri_term_post = customized_function.matrix_to_synapsevar(synapse_e2e, irri_matrix_post)
+
+
+sim_duration = 10 * ms
+network.run=(sim_duration)
 

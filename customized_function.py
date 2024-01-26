@@ -58,31 +58,33 @@ def check_synapseconnection(input_connection):
 
 
 # this function is to build up storage matrix for synapse variables
+# the matrix form Cij is the number synapses of i received FROM j, not i to j
 # as we know, official synapse variables are stored in 1D but could be searched through 2D [i,j] (not [i][j])
 # this function is to return the standard 2D synapse variable to prevent risk
 # synapsecon is the synnapse name, synapsevar is the synapse variable name you want to convert
 # source and target should be the source and target group of synapsecon (must to be consistent)
-# i to j which is not connected will be marked as nan
-# use as W = customized_function.synapsevar_matrix_generator(synapses,synapses.w,neurons,neurons)
+# i to j which is not connected will be marked as 0
+# use as W = customized_function.synapsevar_matrix_generator(synapses,synapses.w)
 def synapsevar_to_matrix (synapsename,synapsevar):
     buffer=synapsevar
-    W_EE = np.full((synapsename.source.N,synapsename.target.N),np.nan)    # create a matrix with the size source * target [i,j] with 0.
+    W_EE = np.full((synapsename.source.N,synapsename.target.N),0)    # create a matrix with the size source * target [i,j] with 0.
     # buffer.i  buffer.j are like grid in matlab, which contains coordinates pairs of all the potential connection
     for i,j in zip(synapsename.i,synapsename.j):
         W_EE[i][j]=buffer[i,j]
-
+    W_EE=np.transpose(W_EE)   # convert Cij from 'i to j' to 'i from j'
     return W_EE
 
 
 
 # this function is to convert the storage matrix to synapse variable
+# the matrix form Cij is the number synapses of i received FROM j, not i to j
 # as the inverse function of 'synapsevar_to_matrix'
 # the matrix should be in forms of M*N, a_mn means the var number of connection i=m and j=n
 # the result should be the update of synapsevar, consistent with the official synapsevar storage form
 # you could convert a synapsevar to matrix and convert it back, it is the same
 # use as: synapse_e2e.c = customized_function.matrix_to_synapsevar(synapse_e2e,C)
 def matrix_to_synapsevar (synapsename,matrix):
-    buffer=matrix
+    buffer=np.transpose(matrix)   # convert Cij from 'i to j' to 'i from j'
     output_array=[]    #reset the synapsevar
     for i,j in zip(synapsename.i,synapsename.j):    # go through all the connection
         output_array.append(buffer[i][j])   #for every connection in the list, give the matrix number to the connection
