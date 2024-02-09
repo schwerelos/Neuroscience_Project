@@ -64,7 +64,7 @@ def check_synapseconnection(input_connection):
 # synapsecon is the synnapse name, synapsevar is the synapse variable name you want to convert
 # source and target should be the source and target group of synapsecon (must to be consistent)
 # i to j which is not connected will be marked as 0
-# use as W = customized_function.synapsevar_matrix_generator(synapses,synapses.w)
+# use as W = customized_function.synapsevar_to_matrix(synapses,synapses.w)
 def synapsevar_to_matrix (synapsename,synapsevar):
     buffer=synapsevar
     W_EE = np.full((synapsename.source.N,synapsename.target.N),0)    # create a matrix with the size source * target [i,j] with 0.
@@ -89,12 +89,13 @@ def matrix_to_synapsevar (synapsename,matrix):
     for i,j in zip(synapsename.i,synapsename.j):    # go through all the connection
         output_array.append(buffer[i][j])   #for every connection in the list, give the matrix number to the connection
 
-    non_nan_sum = np.sum(~np.isnan(buffer))   # all non-nan element number , to see if there is any miss
-    if len(synapsename.i)!= non_nan_sum :
-        warning_message=f'''data missing during convertion,
-        {len(synapsename.i)} valid connections while {non_nan_sum} valid matrix elements   
-        '''
-        warnings.warn(warning_message, Warning)
+    # previously used when the non connection pat is marked as nan (NOT necessary)
+    # non_nan_sum = np.sum(~np.isnan(buffer))   # all non-nan element number , to see if there is any miss
+    # if len(synapsename.i)!= non_nan_sum :
+    #     warning_message=f'''data missing during convertion,
+    #     {len(synapsename.i)} valid connections while {non_nan_sum} valid matrix elements
+    #     '''
+    #     warnings.warn(warning_message, Warning)
 
     return output_array
 
@@ -130,4 +131,17 @@ def matrix_to_synapsevar (synapsename,matrix):
 # # time constant for main equation and calcium concentration
 # tau_m=1 * second
 # tau_ca=1 * second
+
+####################
+# function manuscript storage
+
+# # this function can generate n connections from neuron group A and B randomly
+# # N_a and N_b are the number of neurons in each group, expected to be a integral, such as 30,50
+# # N_connection is the number of random connection you want to generate
+# # return a generated connection pair such as [(3,5),(6,9)]
+# def assign_connection (N_a, N_b, N_connection):
+#     N_connection=int(N_connection)    #prevent a bug that random can't recognize number of division as float
+#     random_connections = [(i, j) for i in range(1, N_a) for j in range(1, N_b)]
+#     random_connections = sample(random_connections, N_connection)
+#     return random_connections
 

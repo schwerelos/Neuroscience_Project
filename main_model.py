@@ -34,7 +34,7 @@
 # IMPORTANT ！！！！
 # don't forget the neuron number
 # the current variable are all unitless
-# poisson amplitude tau_m J is 20 or 20e-3?
+# pay attentiom to the current poisson amplitude, don't foorget to change it back to standard
 
 from brian2 import *
 import matplotlib.pyplot as plt
@@ -44,8 +44,8 @@ import numpy as np
 start_scope()
 
 # define some value
-N_E = 100      #number of excitatory and inhibitory neuron
-N_I = 25
+N_E = 1000      #number of excitatory and inhibitory neuron
+N_I = 250
 
 
 V_th=20e-3      # firing threshold and reset voltage of LIF
@@ -72,12 +72,12 @@ J=0.1e-3
 g=8       #inhibitory connection factor
 J_E=J
 J_I=-(g*J)      #connection strength, fixed
-J_poisson = 20*J  # set amplitude as 20 instead of 20e-3 temporary
+J_poisson = 40 * J  # the effect of poisson amplitude is taum J as specified in the article
 
 # some other constant
 weight_standard=1   #standard weight for each synapse, only C change
-
-sim_duration = 3 * ms
+defaultclock.dt = 0.05 * ms
+sim_duration = 100 * ms
 total_step=int(sim_duration/defaultclock.dt)
 step_count=[0]
 
@@ -127,30 +127,28 @@ US_marker,C1_marker,C2_marker = customized_function.assign_group(N_E,N_I)
 # e to e will be set as no connection temporarily as mentioned
 # input group, one to one connection, 1-2499 connect exc group 2500-3499 connect inh group
 # readout connect all US group (first picture)
-buffer = customized_function.assign_connection(N_I,N_I,0.1*N_I)
 synapse_i2i = Synapses(inh_group, inh_group, 'w : 1', on_pre='v_post += J_I', method='euler', delay=D)
 # i is always the first element of butter,j the second
-synapse_i2i.connect(i=[count[0] for count in buffer], j=[count[1] for count in buffer])
+synapse_i2i.connect(i='k for k in sample(N_I, size=int(0.1*N_I))')
 synapse_i2i.w = weight_standard
 
-buffer = customized_function.assign_connection(N_I,N_E,0.1*N_I)
 synapse_i2e = Synapses(inh_group, exc_group, 'w : 1', on_pre='v_post += J_I', method='euler',delay=D)
 # i is always the first element of butter,j the second
-synapse_i2e.connect(i=[count[0] for count in buffer], j=[count[1] for count in buffer])
+synapse_i2e.connect(i='k for k in sample(N_I, size=int(0.1*N_I))')
 synapse_i2e.w = weight_standard
 
-buffer = customized_function.assign_connection(N_E,N_I,0.1*N_E)
+
 synapse_e2i = Synapses(exc_group, inh_group, 'w : 1', on_pre='v_post += J_E', method='euler',delay=D)
 # i is always the first element of butter,j the second
-synapse_e2i.connect(i=[count[0] for count in buffer], j=[count[1] for count in buffer])
+synapse_e2i.connect(i='k for k in sample(N_E, size=int(0.1*N_E))')
 synapse_e2i.w = weight_standard
 
 # bind poisson group 1-2500 to exc 2501-3500 to ihn, connection is one to one
-synapse_p2e = Synapses(poissoninput_group, exc_group, 'w : 1', on_pre='v_post += J_poisson', method='euler',delay=D)
+synapse_p2e = Synapses(poissoninput_group, exc_group, 'w : 1', on_pre='v_post += J_poisson', method='euler')
 synapse_p2e.connect(i=list(range(0,N_E,1)), j=list(range(0,N_E,1)))    #i and j is the same, from 0 to N_E-1
 synapse_p2e.w = weight_standard
 
-synapse_p2i = Synapses(poissoninput_group, inh_group, 'w : 1', on_pre='v_post += J_poisson', method='euler',delay=D)
+synapse_p2i = Synapses(poissoninput_group, inh_group, 'w : 1', on_pre='v_post += J_poisson', method='euler')
 synapse_p2i.connect(i=list(range(N_E,N_E+N_I,1)), j=list(range(0,N_I,1)))   #2500-3499 of poisson connect to 0-1499 of inh
 synapse_p2i.w = weight_standard
 
@@ -164,6 +162,9 @@ synapse_e2e = Synapses(exc_group, exc_group, model=synapse_eqs_exc, on_pre='v_po
 synapse_e2e.connect(condition='i!=j')   # all econnect to all exc
 synapse_e2e.w = weight_standard
 
+# connect all exc neurons to themselves to update fai
+synapse_exc_selfcon = Synapses(exc_group, exc_group, model=synapse_eqs_exc, on_pre='fai_post += 1', method='euler')
+synapse_exc_selfcon.connect(condition='i==j')   # all econnect to all exc
 
 
 #customized_function.check_synapseconnection(synapse_e2e)
@@ -181,6 +182,9 @@ synapse_e2e.c=1   # give one connections for each in the initial step to prevent
 
 synapse_e2e.irri_term_first=0
 synapse_e2e.irri_term_second=0
+
+
+
 
 # some monitors
 Vol_mon=StateMonitor(exc_group,'v',record=[1,2,3])
@@ -255,9 +259,12 @@ def my_network_operation():
     step_count[0]+=1
     print(step_count, ' of ', total_step,' has been finished')
 
-    plot(poi_mon.t / ms, poi_mon.i, '.k')
+
 
 run(sim_duration)
+plot(poi_mon.t / ms, poi_mon.i, '.k')
+#plot(Vol_mon.t / ms, Vol_mon.v[0], 'k')
+plt.show()
 pass
 
 #network.run=(sim_duration)
