@@ -21,15 +21,20 @@ v_reset = -60 * mV
 t_refract = 1.75 * ms
 
 # Define the spiking model equations
-eqs_spiking = '''
+eqs_spiking_capacity = '''
 dv/dt = (g_leak * (E_leak - v) + g_E * (E_E - v) + g_I * (E_I - v)) / C : volt (unless refractory)
+g_E : siemens (constant)
+g_I : siemens (constant)
+'''
+#capacity C /g = tau (time constant)
+eqs_spiking = '''
+dv/dt = g_leak * (E_leak - v)/C +  (E_E - v)/tau_E +  (E_I - v)/tau_I  : volt (unless refractory)
 g_E : siemens (constant)
 g_I : siemens (constant)
 '''
 
 # Create excitatory and inhibitory neuron groups for the 0° evoked map
-exc_neurons_evoked = NeuronGroup(num_neurons_exc, eqs_spiking, threshold='v>v_thresh', reset='v=v_reset',
-                                 refractory='t_refract', method='euler')
+exc_neurons_evoked = NeuronGroup(num_neurons_exc, eqs_spiking, threshold='v>v_thresh', reset='v=v_reset', refractory='t_refract', method='euler')
 
 # Set initial conditions for the 0° evoked map
 exc_neurons_evoked.v = E_leak
@@ -43,8 +48,7 @@ spatial_filter = np.exp(-(np.arange(-num_neurons_exc/2, num_neurons_exc/2)**2) /
 
 # Define temporal filter
 temporal_filter_num_steps = 1000
-temporal_filter = (np.linspace(0, num_frames, temporal_filter_num_steps) ** 2) * np.exp(
-    -temporal_filter_gamma * np.linspace(0, num_frames, temporal_filter_num_steps))
+temporal_filter = (np.linspace(0, num_frames, temporal_filter_num_steps) ** 2) * np.exp(-temporal_filter_gamma * np.linspace(0, num_frames, temporal_filter_num_steps))
 
 # Generate background input for the 0° evoked map
 temporal_filter_reshaped = temporal_filter[:, np.newaxis]  # Reshape to column vector
@@ -71,8 +75,6 @@ def compute_background_input_control(num_neurons_exc, num_frames):
     background_input_control = np.random.rand(num_neurons_exc, num_frames)
     return background_input_control
 
-
-# Assuming this is inside your main code where you update the background input
 def input_update_control():
     # Call compute_background_input_control to get background input chunk
     background_input_control_chunk = compute_background_input_control(num_neurons_exc, num_frames)
@@ -82,10 +84,7 @@ def input_update_control():
         raise ValueError("Shape of background input chunk is {}, expected ({}, {})".format(
             background_input_control_chunk.shape, num_neurons_exc, num_frames))
 
-    # Rest of your code goes here...
-
-
-# Call your function to update the background input
+# Call the function to update the background input
 input_update_control()
 
 
