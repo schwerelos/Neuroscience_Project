@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Parameters
-num_neurons_exc = 4000  # Number of excitatory neurons
-num_neurons_inh = 1000  # Number of inhibitory neurons
+num_neurons_exc = 4000  # Number of excitatory neurons (10x shrink)
+num_neurons_inh = 1000  # Number of inhibitory neurons (10x shrink)
 num_frames = 40000  # Number of frames
 theta_stim = 20.  # Stimulus orientation
 t_stim = 80 * ms  # Stimulus duration
