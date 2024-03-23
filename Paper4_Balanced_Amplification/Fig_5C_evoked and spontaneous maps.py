@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Parameters
-num_neurons_exc = 40000  # Number of excitatory neurons
-num_neurons_inh = 10000  # Number of inhibitory neurons
+num_neurons_exc = 4000  # Number of excitatory neurons
+num_neurons_inh = 1000  # Number of inhibitory neurons
 num_frames = 40000  # Number of frames
 theta_stim = 20.  # Stimulus orientation
 t_stim = 80 * ms  # Stimulus duration
@@ -35,6 +35,7 @@ g_I : siemens (constant)
 
 # Create excitatory and inhibitory neuron groups for the 0° evoked map
 exc_neurons_evoked = NeuronGroup(num_neurons_exc, eqs_spiking, threshold='v>v_thresh', reset='v=v_reset', refractory='t_refract', method='euler')
+inh_neurons_evoked = NeuronGroup(num_neurons_exc, eqs_spiking, threshold='v>v_thresh', reset='v=v_reset', refractory='t_refract', method='euler')
 
 # Set initial conditions for the 0° evoked map
 exc_neurons_evoked.v = E_leak
@@ -61,10 +62,10 @@ def input_update_evoked():
 
 # Create excitatory neuron group for the control map
 exc_neurons_control = NeuronGroup(num_neurons_exc, eqs_spiking, threshold='v>v_thresh', reset='v=v_reset', refractory='t_refract', method='euler')
-
+inh_neurons_control = NeuronGroup(num_neurons_exc, eqs_spiking, threshold='v>v_thresh', reset='v=v_reset', refractory='t_refract', method='euler')
 # Set initial conditions for the control map
 exc_neurons_control.v = E_leak
-
+inh_neurons_control.v = E_leak
 # Chunk size for generating background input
 chunk_size = 1000
 
@@ -87,7 +88,31 @@ def input_update_control():
 # Call the function to update the background input
 input_update_control()
 
+# Random connections (no self-connections)
+S_exc2exc = Synapses(exc_neurons_evoked, exc_neurons_evoked)
+S_exc2exc.connect('i != j', p = 0.5)
 
+S_exc2inh = Synapses(exc_neurons_evoked, inh_neurons_evoked)
+S_exc2inh.connect('i != j', p = 0.5)
+
+S_inh2exc = Synapses(inh_neurons_evoked, exc_neurons_evoked)
+S_inh2exc.connect('i != j', p = 0.5)
+
+S_inh2inh = Synapses(inh_neurons_evoked, inh_neurons_evoked)
+S_inh2inh.connect('i != j', p = 0.5)
+
+# Random connections (no self-connections)
+S_exc2exc_control = Synapses(exc_neurons_control, exc_neurons_control)
+S_exc2exc_control.connect('i != j', p = 0.5)
+
+S_exc2inh_control = Synapses(exc_neurons_control, inh_neurons_control)
+S_exc2inh_control.connect('i != j', p = 0.5)
+
+S_inh2exc_control = Synapses(inh_neurons_control, exc_neurons_control)
+S_inh2exc_control.connect('i != j', p = 0.5)
+
+S_inh2inh_control = Synapses(inh_neurons_control, inh_neurons_control)
+S_inh2inh_control.connect('i != j', p = 0.5)
 # Generate simulated responses for the 0° evoked map
 spontaneous_frames_evoked = np.random.rand(num_frames)
 
@@ -102,6 +127,12 @@ run(num_frames * defaultclock.dt)
 
 # Generate simulated responses for the control map
 spontaneous_frames_control = np.random.rand(num_frames)
+
+Mon_exc_control = StateMonitor(exc_neurons_control, 'v', record=True)
+Mon_inh_control = StateMonitor(inh_neurons_control, 'v', record=True)
+
+Mon_exc_evoked = StateMonitor(inh_neurons_evoked, 'v', record=True)
+Mon_exc_control = StateMonitor(inh_neurons_evoked, 'v', record=True)
 
 # Calculate the correlation coefficient for the control map
 correlation_coefficients_control = np.zeros(num_frames)
